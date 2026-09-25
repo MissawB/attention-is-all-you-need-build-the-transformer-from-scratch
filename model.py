@@ -55,8 +55,21 @@ def decode_ids_to_tokens(ids, id_to_token):
 
     return tokens_list
 
-# Step 5 - pad_id_sequence (not yet solved)
-# TODO: implement
+# Step 5 - pad_id_sequence
+def pad_id_sequence(ids, max_len, pad_id):
+    # Return a list of length exactly max_len, padding with pad_id or truncating.
+    list_max_len=[]
+    n=len(ids)
+    i=0
+
+    while len(list_max_len)<max_len:
+        if i<n:
+            list_max_len.append(ids[i])
+        else:
+            list_max_len.append(pad_id)
+        i+=1
+
+    return list_max_len
 
 # Step 6 - stack_padded_sequences_to_batch (not yet solved)
 # TODO: implement
