@@ -118,7 +118,6 @@ def build_position_index_column(max_len):
 
 # Step 10 - fill_even_indices_with_sin
 import torch
-import math
 
 def fill_even_indices_with_sin(pe, position, div_term):
     """Fill even feature indices of pe with sin(position * div_term)."""
