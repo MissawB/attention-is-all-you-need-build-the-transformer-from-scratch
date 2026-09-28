@@ -158,8 +158,13 @@ def add_positional_encoding_to_embeddings(embedded_batch, positional_encoding):
 
     return embedded_batch + positional_encoding[:seq_len, :]
 
-# Step 14 - build_padding_mask (not yet solved)
-# TODO: implement
+# Step 14 - build_padding_mask
+import torch
+
+def build_padding_mask(token_ids, pad_id):
+    """Return a (B, 1, 1, L) bool mask: True where token_ids != pad_id."""
+    # Building a boolean mask marking non-pad positions, shaped for broadcasting against attention scores
+    return (token_ids != pad_id).unsqueeze(1).unsqueeze(2)
 
 # Step 15 - build_causal_mask (not yet solved)
 # TODO: implement
@@ -318,6 +323,9 @@ def add_positional_encoding_to_embeddings(embedded_batch, positional_encoding):
 # TODO: implement
 
 # Step 67 - apply_adam_bias_correction (not yet solved)
+# TODO: implement
+
+# Step 68 - compute_adam_parameter_update (not yet solved)
 # TODO: implement
 
 # Step 69 - apply_adam_step_to_all_parameters (not yet solved)

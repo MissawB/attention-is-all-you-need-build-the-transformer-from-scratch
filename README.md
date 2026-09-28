@@ -23,7 +23,7 @@ python scaffold.py
 - [x] **11.** fill_odd_indices_with_cos
 - [x] **12.** build_sinusoidal_positional_encoding
 - [x] **13.** add_positional_encoding_to_embeddings
-- [ ] **14.** build_padding_mask
+- [x] **14.** build_padding_mask
 - [ ] **15.** build_causal_mask
 - [ ] **16.** combine_padding_and_causal_masks
 - [ ] **17.** compute_raw_attention_scores
@@ -77,6 +77,7 @@ python scaffold.py
 - [ ] **65.** update_adam_first_moment
 - [ ] **66.** update_adam_second_moment
 - [ ] **67.** apply_adam_bias_correction
+- [ ] **68.** compute_adam_parameter_update
 - [ ] **69.** apply_adam_step_to_all_parameters
 - [ ] **70.** zero_all_parameter_gradients
 - [ ] **71.** compute_batch_training_loss
