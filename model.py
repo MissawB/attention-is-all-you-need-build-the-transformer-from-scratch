@@ -289,8 +289,12 @@ def split_qkv_into_heads(q, k, v, num_heads):
     v_head = transpose_heads_before_sequence(split_last_dim_into_heads(v, num_heads))
     return (q_head, k_head, v_head)
 
-# Step 29 - multi_head_scaled_dot_product_attention (not yet solved)
-# TODO: implement
+# Step 29 - multi_head_scaled_dot_product_attention
+import torch
+
+def multi_head_scaled_dot_product_attention(q_h, k_h, v_h, mask=None):
+    # Running scaled dot-product attention over per-head Q, K, V and return (context, weights)
+    return scaled_dot_product_attention(q_h, k_h, v_h, mask=mask)
 
 # Step 30 - merge_heads_and_project_output (not yet solved)
 # TODO: implement
