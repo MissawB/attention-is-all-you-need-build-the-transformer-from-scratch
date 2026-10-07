@@ -420,8 +420,20 @@ def assemble_encoder_layer(x, layer_params, num_heads, src_mask):
 
     return out
 
-# Step 42 - stack_encoder_layers (not yet solved)
-# TODO: implement
+# Step 42 - stack_encoder_layers
+def stack_encoder_layers(x, encoder_layer_params_list, num_heads, src_mask):
+    # Sequentially apply each encoder layer to the running hidden state and return the final tensor.
+    hidden_state = x
+
+    for layer_params in encoder_layer_params_list:
+        hidden_state = assemble_encoder_layer(
+            hidden_state,
+            layer_params,
+            num_heads,
+            src_mask=src_mask,
+        )
+
+    return hidden_state
 
 # Step 43 - decoder_layer_masked_self_attention_sublayer (not yet solved)
 # TODO: implement
