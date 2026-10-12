@@ -562,11 +562,101 @@ def apply_log_softmax_over_vocab(logits):
     # Convert decoder logits (B, T, V) into log probabilities over the vocabulary axis.
     return F.log_softmax(logits, dim=-1)
 
-# Step 51 - run_transformer_forward (not yet solved)
-# TODO: implement
+# Step 51 - run_transformer_forward
+def run_transformer_forward(src_ids, tgt_ids, model_params, num_heads, pad_id):
+    # Embed src+tgt, add PE, build masks, run encoder/decoder, project to log probs.
+    token_emb_weight = model_params["token_embedding"]
+    d_model = token_emb_weight.shape[1]
 
-# Step 52 - init_encoder_layer_parameters (not yet solved)
-# TODO: implement
+    # 1. Embed tokens (scaled by sqrt(d_model)) and add positional encoding
+    src_emb = (
+        lookup_token_embeddings(src_tokens, token_emb_weight)
+        * (d_model**0.5)
+    )
+    src_input = add_positional_encoding(src_emb)
+
+    tgt_emb = (
+        lookup_token_embeddings(tgt_tokens, token_emb_weight)
+        * (d_model**0.5)
+    )
+    tgt_input = add_positional_encoding(tgt_emb)
+
+    # 2. Build masks
+    # Source mask: (batch, 1, 1, src_seq)
+    src_mask = create_padding_mask(src_tokens, pad_idx)
+
+    # Target mask: combination of padding mask and causal mask -> (batch, 1, tgt_seq, tgt_seq)
+    tgt_padding_mask = create_padding_mask(tgt_tokens, pad_idx)
+    tgt_causal_mask = create_causal_mask(tgt_tokens.shape[1]).to(
+        tgt_tokens.device
+    )
+    tgt_mask = tgt_padding_mask & tgt_causal_mask
+
+    # 3. Run Encoder Stack
+    encoder_output = stack_encoder_layers(
+        x=src_input,
+        encoder_layer_params_list=model_params["encoder_layers"],
+        num_heads=num_heads,
+        src_mask=src_mask,
+    )
+
+    # 4. Run Decoder Stack
+    decoder_output = stack_decoder_layers(
+        y=tgt_input,
+        encoder_output=encoder_output,
+        decoder_layer_params_list=model_params["decoder_layers"],
+        num_heads=num_heads,
+        tgt_mask=tgt_mask,
+        src_mask=src_mask,
+    )
+
+    # 5. Output Projection & Log-Softmax
+    logits = apply_final_output_projection(
+        decoder_output=decoder_output,
+        w_out=model_params["output_projection"],
+    )
+
+    return apply_log_softmax_over_vocab(logits)
+
+# Step 52 - init_encoder_layer_parameters
+import torch
+import math
+
+def init_encoder_layer_parameters(d_model, num_heads, d_ff):
+    """Return a dict of leaf tensors with requires_grad=True for one encoder layer."""
+    # Allocate w_q, w_k, w_v, w_o, w1, b1, w2, b2, attn_gamma, attn_beta, ffn_gamma, ffn_beta.
+    scale = 1.0 / math.sqrt(d_model)
+    
+    def rand_weight(r, c):
+        return (torch.randn(r, c, dtype=torch.float32) * scale).requires_grad_(True)
+        
+    def zeros_bias(d):
+        return torch.zeros(d, dtype=torch.float32, requires_grad=True)
+        
+    def ones_norm(d):
+        return torch.ones(d, dtype=torch.float32, requires_grad=True)
+
+    return {
+        # Attention projections (d_model, d_model)
+        "w_q": rand_weight(d_model, d_model),
+        "w_k": rand_weight(d_model, d_model),
+        "w_v": rand_weight(d_model, d_model),
+        "w_o": rand_weight(d_model, d_model),
+        
+        # Attention LayerNorm parameters
+        "attn_gamma": ones_norm(d_model),
+        "attn_beta": zeros_bias(d_model),
+        
+        # Position-wise Feed-Forward parameters
+        "w1": rand_weight(d_model, d_ff),
+        "b1": zeros_bias(d_ff),
+        "w2": rand_weight(d_ff, d_model),
+        "b2": zeros_bias(d_model),
+        
+        # FFN LayerNorm parameters
+        "ffn_gamma": ones_norm(d_model),
+        "ffn_beta": zeros_bias(d_model),
+    }
 
 # Step 53 - init_decoder_layer_parameters (not yet solved)
 # TODO: implement
