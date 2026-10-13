@@ -763,8 +763,24 @@ def collect_model_parameters_into_list(encoder_layer_params, decoder_layer_param
 
     return param_list
 
-# Step 56 - shift_targets_right_with_start_token (not yet solved)
-# TODO: implement
+# Step 56 - shift_targets_right_with_start_token
+def shift_targets_right_with_start_token(target_ids, start_token_id):
+    # Prepend start_token_id and drop the last column so output shape matches target_ids
+    batch_size = target_ids.size(0)
+
+    # 1. Create a column of start tokens matching the input's dtype and device
+    start_tokens = torch.full(
+        (batch_size, 1),
+        start_token_id,
+        dtype=target_ids.dtype,
+        device=target_ids.device,
+    )
+
+    # 2. Slice off the last token of the target_ids to maintain the original sequence length
+    shifted_targets = target_ids[:, :-1]
+
+    # 3. Concatenate the start tokens with the shifted targets along the sequence dimension
+    return torch.cat([start_tokens, shifted_targets], dim=1)
 
 # Step 57 - compute_noam_learning_rate (not yet solved)
 # TODO: implement
