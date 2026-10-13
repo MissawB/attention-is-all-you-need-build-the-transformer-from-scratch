@@ -740,23 +740,26 @@ def collect_model_parameters_into_list(encoder_layer_params, decoder_layer_param
     param_list = []
     seen_ids = set()
 
-    def add_tensors_from_dict(param_dict: dict):
+    def add_unique_tensors(param_dict: dict):
         for tensor in param_dict.values():
+            # Use id() to track memory addresses.
+            # If tie_weights=True, output_projection and tgt_embedding share the same id,
+            # so the tensor is only appended to the optimizer list once.
             t_id = id(tensor)
             if t_id not in seen_ids:
                 param_list.append(tensor)
                 seen_ids.add(t_id)
 
-    # 1. Encoder parameters first (in order)
-    for enc_layer in encoder_layer_params:
-        add_tensors_from_dict(enc_layer)
+    # 1. Encoder parameters first (in insertion order)
+    for enc_dict in encoder_layer_params:
+        add_unique_tensors(enc_dict)
 
-    # 2. Decoder parameters next (in order)
-    for dec_layer in decoder_layer_params:
-        add_tensors_from_dict(dec_layer)
+    # 2. Decoder parameters next (in insertion order)
+    for dec_dict in decoder_layer_params:
+        add_unique_tensors(dec_dict)
 
     # 3. Embedding and projection parameters last
-    add_tensors_from_dict(embeddings_and_projections)
+    add_unique_tensors(embedding_params)
 
     return param_list
 
