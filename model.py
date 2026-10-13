@@ -565,58 +565,84 @@ def apply_log_softmax_over_vocab(logits):
 # Step 51 - run_transformer_forward
 def run_transformer_forward(src_ids, tgt_ids, model_params, num_heads, pad_id):
     # Embed src+tgt, add PE, build masks, run encoder/decoder, project to log probs.
-    token_emb_weight = model_params["token_embedding"]
-    d_model = token_emb_weight.shape[1]
 
-    # 1. Embed tokens (scaled by sqrt(d_model)) and add positional encoding
-    src_emb = (
-        lookup_token_embeddings(src_tokens, token_emb_weight)
-        * (d_model**0.5)
+    token_emb = model_params["token_embedding"]
+    enc_layers = model_params["encoder_layers"]
+    dec_layers = model_params["decoder_layers"]
+    out_proj = model_params["output_projection"]
+
+    d_model = token_emb.shape[1]
+
+    # 1. Token embeddings, scaled by sqrt(d_model)
+    src_emb = F.embedding(src_ids, token_emb) * math.sqrt(d_model)
+    tgt_emb = F.embedding(tgt_ids, token_emb) * math.sqrt(d_model)
+
+    # 2. Sinusoidal positional encoding
+    def add_pe(x):
+        seq_len = x.shape[1]
+
+        pos = torch.arange(
+            seq_len, device=x.device, dtype=torch.float32
+        ).unsqueeze(1)
+
+        div_term = torch.exp(
+            torch.arange(
+                0, d_model, 2,
+                device=x.device,
+                dtype=torch.float32
+            ) * (-math.log(10000.0) / d_model)
+        )
+
+        angles = pos * div_term
+        pe = torch.zeros(
+            seq_len, d_model,
+            device=x.device,
+            dtype=torch.float32
+        )
+
+        pe[:, 0::2] = torch.sin(angles)
+        pe[:, 1::2] = torch.cos(angles[:, :d_model // 2])
+
+        return x + pe.to(x.dtype).unsqueeze(0)
+
+    src_in = add_pe(src_emb)
+    tgt_in = add_pe(tgt_emb)
+
+    # 3. Source padding mask
+    # True = token is visible
+    src_mask = (src_ids != pad_id)[:, None, None, :]
+
+    # 4. Combined target padding and causal mask
+    tgt_len = tgt_ids.shape[1]
+
+    tgt_pad_mask = (tgt_ids != pad_id)[:, None, None, :]
+
+    causal_mask = torch.tril(
+        torch.ones(
+            tgt_len, tgt_len,
+            device=tgt_ids.device,
+            dtype=torch.bool
+        )
+    )[None, None, :, :]
+
+    tgt_mask = tgt_pad_mask & causal_mask
+
+    # 5. Encoder
+    enc_out = stack_encoder_layers(
+        src_in, enc_layers, num_heads, src_mask
     )
-    src_input = add_positional_encoding(src_emb)
 
-    tgt_emb = (
-        lookup_token_embeddings(tgt_tokens, token_emb_weight)
-        * (d_model**0.5)
-    )
-    tgt_input = add_positional_encoding(tgt_emb)
-
-    # 2. Build masks
-    # Source mask: (batch, 1, 1, src_seq)
-    src_mask = create_padding_mask(src_tokens, pad_idx)
-
-    # Target mask: combination of padding mask and causal mask -> (batch, 1, tgt_seq, tgt_seq)
-    tgt_padding_mask = create_padding_mask(tgt_tokens, pad_idx)
-    tgt_causal_mask = create_causal_mask(tgt_tokens.shape[1]).to(
-        tgt_tokens.device
-    )
-    tgt_mask = tgt_padding_mask & tgt_causal_mask
-
-    # 3. Run Encoder Stack
-    encoder_output = stack_encoder_layers(
-        x=src_input,
-        encoder_layer_params_list=model_params["encoder_layers"],
-        num_heads=num_heads,
-        src_mask=src_mask,
+    # 6. Decoder
+    dec_out = stack_decoder_layers(
+        tgt_in, enc_out, dec_layers,
+        num_heads, tgt_mask, src_mask
     )
 
-    # 4. Run Decoder Stack
-    decoder_output = stack_decoder_layers(
-        y=tgt_input,
-        encoder_output=encoder_output,
-        decoder_layer_params_list=model_params["decoder_layers"],
-        num_heads=num_heads,
-        tgt_mask=tgt_mask,
-        src_mask=src_mask,
-    )
+    # 7. Vocabulary projection
+    logits = F.linear(dec_out, out_proj)
 
-    # 5. Output Projection & Log-Softmax
-    logits = apply_final_output_projection(
-        decoder_output=decoder_output,
-        w_out=model_params["output_projection"],
-    )
-
-    return apply_log_softmax_over_vocab(logits)
+    # 8. Log probabilities
+    return F.log_softmax(logits, dim=-1)
 
 # Step 52 - init_encoder_layer_parameters
 import torch
@@ -728,8 +754,33 @@ def init_embedding_and_projection_parameters(vocab_size, d_model, tie_weights=Tr
         "output_projection": output_projection,
     }
 
-# Step 55 - collect_model_parameters_into_list (not yet solved)
-# TODO: implement
+# Step 55 - collect_model_parameters_into_list
+import torch
+
+def collect_model_parameters_into_list(encoder_layer_params, decoder_layer_params, embedding_params):
+    # Walk the encoder, decoder, and embedding dicts and return a flat deduped list of tensors
+    param_list = []
+    seen_ids = set()
+
+    def add_tensors_from_dict(param_dict: dict):
+        for tensor in param_dict.values():
+            t_id = id(tensor)
+            if t_id not in seen_ids:
+                param_list.append(tensor)
+                seen_ids.add(t_id)
+
+    # 1. Encoder parameters first (in order)
+    for enc_layer in encoder_layer_params:
+        add_tensors_from_dict(enc_layer)
+
+    # 2. Decoder parameters next (in order)
+    for dec_layer in decoder_layer_params:
+        add_tensors_from_dict(dec_layer)
+
+    # 3. Embedding and projection parameters last
+    add_tensors_from_dict(embeddings_and_projections)
+
+    return param_list
 
 # Step 56 - shift_targets_right_with_start_token (not yet solved)
 # TODO: implement
